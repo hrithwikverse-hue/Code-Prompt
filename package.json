@@ -1,0 +1,368 @@
+{
+  "name": "code-prompt",
+  "displayName": "Code Prompt",
+  "description": "Export your entire project as structured Markdown for ChatGPT, Claude, and other AI tools. Use free AI tiers with full project context.",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters"
+  ],
+  "keywords": [
+    "AI",
+    "ChatGPT",
+    "Claude",
+    "context",
+    "export",
+    "markdown",
+    "code review",
+    "refactor"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourname/code-prompt"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiContext.exportFull",
+        "title": "Export Full Project Context",
+        "category": "AI Context",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "aiContext.exportSrc",
+        "title": "Export Source Folder Only",
+        "category": "AI Context"
+      },
+      {
+        "command": "aiContext.exportSelected",
+        "title": "Export Selected Folder",
+        "category": "AI Context"
+      },
+      {
+        "command": "aiContext.exportSmart",
+        "title": "Smart Export (Summary + Key Files)",
+        "category": "AI Context"
+      },
+      {
+        "command": "aiContext.exportChunked",
+        "title": "Export Chunked (Split Large Projects)",
+        "category": "AI Context"
+      },
+      {
+        "command": "aiContext.configure",
+        "title": "Configure Export Settings",
+        "category": "AI Context"
+      },
+      {
+        "command": "aiContext.exportCurrentFile",
+        "title": "Export Current File",
+        "category": "AI Context"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "codeprompt.submenu",
+        "label": "Code Prompt"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "aiContext.exportFull",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "workspaceFolderCount > 0"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "codeprompt.submenu",
+          "group": "navigation@100"
+        }
+      ],
+      "explorer/context": [
+        {
+          "submenu": "codeprompt.submenu",
+          "group": "navigation@100"
+        }
+      ],
+      "codeprompt.submenu": [
+        {
+          "command": "aiContext.exportFull",
+          "group": "1@1"
+        },
+        {
+          "command": "aiContext.exportSmart",
+          "group": "1@2"
+        },
+        {
+          "command": "aiContext.exportSrc",
+          "group": "1@3"
+        },
+        {
+          "command": "aiContext.exportCurrentFile",
+          "group": "1@4"
+        },
+        {
+          "command": "aiContext.exportChunked",
+          "group": "1@5"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "aiContext.exportFull",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiContextExplorer",
+          "title": "Code Prompt",
+          "icon": "$(file-code)"
+        }
+      ]
+    },
+    "views": {
+      "aiContextExplorer": [
+        {
+          "type": "webview",
+          "id": "aiContext.sidebar",
+          "name": "Export Controls"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Code Prompt",
+      "properties": {
+        "aiContext.ignoredFolders": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".next",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "env",
+            ".env",
+            "coverage",
+            ".nyc_output",
+            ".cache",
+            ".parcel-cache",
+            "out",
+            ".svelte-kit",
+            ".nuxt",
+            ".output",
+            "vendor",
+            "target",
+            "bin",
+            "obj",
+            ".idea",
+            ".vscode",
+            ".terraform",
+            "terraform.tfstate.d"
+          ],
+          "description": "Folders to ignore during export"
+        },
+        "aiContext.ignoredFiles": {
+          "type": "array",
+          "default": [
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "composer.lock",
+            "Gemfile.lock",
+            "Cargo.lock",
+            "poetry.lock",
+            ".DS_Store",
+            "Thumbs.db",
+            "*.min.js",
+            "*.min.css",
+            "*.map",
+            "*.ico",
+            "*.png",
+            "*.jpg",
+            "*.jpeg",
+            "*.gif",
+            "*.svg",
+            "*.woff",
+            "*.woff2",
+            "*.ttf",
+            "*.eot",
+            "*.mp3",
+            "*.mp4",
+            "*.webm",
+            "*.pdf",
+            "*.zip",
+            "*.tar",
+            "*.gz",
+            "*.exe",
+            "*.dll",
+            "*.so",
+            "*.dylib",
+            "*.pyc",
+            "*.class",
+            "*.o"
+          ],
+          "description": "File patterns to ignore during export"
+        },
+        "aiContext.maxFileSizeKB": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum file size in KB to include"
+        },
+        "aiContext.chunkSizeKB": {
+          "type": "number",
+          "default": 50,
+          "description": "Target chunk size in KB for chunked export"
+        },
+        "aiContext.includeLineNumbers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include line numbers in exported code"
+        },
+        "aiContext.autoCopyToClipboard": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically copy export to clipboard"
+        },
+        "aiContext.outputLocation": {
+          "type": "string",
+          "enum": [
+            "clipboard",
+            "file",
+            "both",
+            "newTab"
+          ],
+          "default": "both",
+          "description": "Where to output the generated context"
+        },
+        "aiContext.smartExportMaxFiles": {
+          "type": "number",
+          "default": 20,
+          "description": "Maximum number of key files in smart export"
+        },
+        "aiContext.supportedExtensions": {
+          "type": "array",
+          "default": [
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".py",
+            ".rb",
+            ".go",
+            ".rs",
+            ".java",
+            ".kt",
+            ".cs",
+            ".cpp",
+            ".c",
+            ".h",
+            ".hpp",
+            ".swift",
+            ".php",
+            ".vue",
+            ".svelte",
+            ".html",
+            ".css",
+            ".scss",
+            ".sass",
+            ".less",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".xml",
+            ".sql",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".fish",
+            ".ps1",
+            ".bat",
+            ".cmd",
+            ".lua",
+            ".r",
+            ".R",
+            ".jl",
+            ".ex",
+            ".exs",
+            ".erl",
+            ".hrl",
+            ".clj",
+            ".cljs",
+            ".scala",
+            ".hs",
+            ".ml",
+            ".mli",
+            ".fs",
+            ".fsx",
+            ".dart",
+            ".tf",
+            ".hcl",
+            ".proto",
+            ".graphql",
+            ".gql",
+            ".md",
+            ".mdx",
+            ".txt",
+            ".env.example",
+            ".env.sample",
+            "Dockerfile",
+            "Makefile",
+            "Rakefile",
+            "Gemfile",
+            "Pipfile",
+            ".gitignore",
+            ".dockerignore",
+            ".editorconfig",
+            ".prettierrc",
+            ".eslintrc",
+            "nginx.conf"
+          ],
+          "description": "File extensions to include in export"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/micromatch": "^4.0.10",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.2",
+    "micromatch": "^4.0.5"
+  },
+  "overrides": {
+    "uuid": "14.0.0"
+  }
+}

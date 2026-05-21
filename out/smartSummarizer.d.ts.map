@@ -1,0 +1,1 @@
+{"version":3,"file":"smartSummarizer.d.ts","sourceRoot":"","sources":["../src/smartSummarizer.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,WAAW,EAAE,MAAM,WAAW,CAAC;AACxC,OAAO,EAAE,QAAQ,EAAgB,MAAM,eAAe,CAAC;AACvD,OAAO,EAAE,YAAY,EAAE,MAAM,UAAU,CAAC;AASxC,wBAAgB,WAAW,CACvB,IAAI,EAAE,QAAQ,EACd,QAAQ,EAAE,WAAW,EAAE,EACvB,MAAM,EAAE,YAAY,EACpB,aAAa,EAAE,MAAM,GACtB,MAAM,CAiGR"}
