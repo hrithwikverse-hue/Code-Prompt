@@ -37,6 +37,7 @@ exports.smartExport = smartExport;
 const path = __importStar(require("path"));
 const treeBuilder_1 = require("./treeBuilder");
 const gitUtils_1 = require("./gitUtils");
+const fileRegistry_1 = require("./fileRegistry");
 function smartExport(tree, allFiles, config, workspacePath) {
     const sections = [];
     const maxFiles = config.smartExportMaxFiles;
@@ -128,80 +129,92 @@ function scoreFile(file) {
     const name = path.basename(file.relativePath).toLowerCase();
     const dir = path.dirname(file.relativePath).toLowerCase();
     const relPath = file.relativePath.toLowerCase();
-    // Entry points
-    if (['index.ts', 'index.js', 'main.ts', 'main.js', 'app.ts', 'app.js',
+    // --- High-priority file bonus from registry ---
+    const hpBonus = fileRegistry_1.HIGH_PRIORITY_FILENAMES.get(name);
+    if (hpBonus !== undefined) {
+        score += hpBonus;
+        reasons.push('key config/manifest');
+    }
+    // --- Entry points ---
+    if (['index.ts', 'index.js', 'index.tsx', 'index.jsx', 'main.ts', 'main.js',
+        'app.ts', 'app.js', 'app.tsx', 'app.jsx',
         'server.ts', 'server.js', 'main.py', 'app.py', 'manage.py',
-        'main.go', 'main.rs', 'lib.rs', 'mod.rs'].includes(name)) {
+        'main.go', 'main.rs', 'lib.rs', 'mod.rs',
+        'index.astro', 'app.svelte', 'app.vue',
+        'main.dart', 'main.swift', 'main.kt', 'main.java',
+        'main.cpp', 'main.c', 'main.zig'].includes(name)) {
         score += 50;
         reasons.push('entry point');
     }
-    // Config files
-    if (['package.json', 'tsconfig.json', 'pyproject.toml', 'cargo.toml',
-        'go.mod', 'gemfile', 'requirements.txt', 'docker-compose.yml',
-        'dockerfile', '.env.example', 'makefile'].includes(name)) {
-        score += 40;
+    // --- Config files not already in HIGH_PRIORITY_FILENAMES ---
+    if (['tsconfig.json', '.env.example', '.env.sample', '.env.template',
+        'makefile', '.editorconfig'].includes(name) && !reasons.includes('key config/manifest')) {
+        score += 35;
         reasons.push('config');
     }
-    // Route/API files
+    // --- Route/API files ---
     if (relPath.includes('route') || relPath.includes('router') ||
         relPath.includes('controller') || relPath.includes('endpoint') ||
         relPath.includes('api/')) {
         score += 35;
         reasons.push('API/routes');
     }
-    // Model/Schema files
+    // --- Model/Schema files ---
     if (relPath.includes('model') || relPath.includes('schema') ||
         relPath.includes('entity') || relPath.includes('migration')) {
         score += 30;
         reasons.push('data model');
     }
-    // Middleware / Auth
+    // --- Middleware / Auth ---
     if (relPath.includes('middleware') || relPath.includes('auth') ||
         relPath.includes('guard') || relPath.includes('permission')) {
         score += 28;
         reasons.push('middleware/auth');
     }
-    // Service / Business logic
+    // --- Service / Business logic ---
     if (relPath.includes('service') || relPath.includes('usecase') ||
         relPath.includes('handler') || relPath.includes('resolver')) {
         score += 25;
         reasons.push('business logic');
     }
-    // Utils/Helpers
+    // --- AI / ML specific files ---
+    if (relPath.includes('train') || relPath.includes('model') ||
+        relPath.includes('inference') || relPath.includes('dataset') ||
+        relPath.includes('pipeline') || relPath.includes('embeddings')) {
+        score += 22;
+        reasons.push('AI/ML');
+    }
+    // --- Utils/Helpers ---
     if (relPath.includes('util') || relPath.includes('helper') ||
         relPath.includes('lib/')) {
         score += 15;
         reasons.push('utility');
     }
-    // Tests (lower priority)
+    // --- Tests (lower priority) ---
     if (relPath.includes('test') || relPath.includes('spec') ||
-        relPath.includes('__test__')) {
+        relPath.includes('__test__') || relPath.includes('__tests__')) {
         score += 5;
         reasons.push('test');
     }
-    // Type definitions
+    // --- Type definitions ---
     if (name.endsWith('.d.ts') || relPath.includes('types') ||
         relPath.includes('interfaces')) {
         score += 20;
         reasons.push('types');
     }
-    // Root level files get a bonus
+    // --- Root level files get a bonus ---
     if (!relPath.includes('/')) {
         score += 10;
         reasons.push('root');
     }
-    // Shorter files are more likely to be focused/important
+    // --- Shorter files are more likely to be focused/important ---
     if (file.lineCount < 50) {
         score += 5;
     }
     else if (file.lineCount > 500) {
         score -= 5;
     }
-    // README
-    if (name === 'readme.md') {
-        score += 45;
-        reasons.push('documentation');
-    }
+    // --- README already handled by HIGH_PRIORITY_FILENAMES ---
     if (reasons.length === 0) {
         reasons.push('source file');
         score += 10;
@@ -213,81 +226,115 @@ function scoreFile(file) {
     };
 }
 function detectTechStack(files) {
-    const stack = [];
+    const stack = new Set();
     const fileNames = files.map(f => path.basename(f.relativePath).toLowerCase());
     const allPaths = files.map(f => f.relativePath.toLowerCase());
-    // Package managers / runtimes
-    if (fileNames.includes('package.json')) {
-        stack.push('Node.js / npm');
-        // Try to detect framework from package.json
-        const pkg = files.find(f => f.relativePath === 'package.json');
-        if (pkg) {
-            try {
-                const parsed = JSON.parse(pkg.content);
-                const allDeps = {
-                    ...parsed.dependencies,
-                    ...parsed.devDependencies,
-                };
-                if (allDeps['react'])
-                    stack.push('React');
-                if (allDeps['next'])
-                    stack.push('Next.js');
-                if (allDeps['vue'])
-                    stack.push('Vue.js');
-                if (allDeps['nuxt'])
-                    stack.push('Nuxt.js');
-                if (allDeps['svelte'])
-                    stack.push('Svelte');
-                if (allDeps['@sveltejs/kit'])
-                    stack.push('SvelteKit');
-                if (allDeps['express'])
-                    stack.push('Express.js');
-                if (allDeps['fastify'])
-                    stack.push('Fastify');
-                if (allDeps['@nestjs/core'])
-                    stack.push('NestJS');
-                if (allDeps['angular'])
-                    stack.push('Angular');
-                if (allDeps['tailwindcss'])
-                    stack.push('Tailwind CSS');
-                if (allDeps['prisma'] || allDeps['@prisma/client'])
-                    stack.push('Prisma');
-                if (allDeps['mongoose'])
-                    stack.push('MongoDB / Mongoose');
-                if (allDeps['typeorm'])
-                    stack.push('TypeORM');
-                if (allDeps['drizzle-orm'])
-                    stack.push('Drizzle ORM');
-            }
-            catch { }
+    const fileNameSet = new Set(fileNames);
+    // --- Filename-based signals from registry ---
+    for (const [signal, labels] of fileRegistry_1.FILENAME_TECH_SIGNALS) {
+        if (fileNameSet.has(signal)) {
+            labels.forEach(l => stack.add(l));
         }
     }
-    if (fileNames.includes('pyproject.toml') || fileNames.includes('requirements.txt')) {
-        stack.push('Python');
+    // --- npm package.json dependency signals ---
+    const pkg = files.find(f => f.relativePath === 'package.json' || f.relativePath.endsWith('/package.json'));
+    if (pkg) {
+        stack.add('Node.js / npm');
+        try {
+            const parsed = JSON.parse(pkg.content);
+            const allDeps = {
+                ...parsed.dependencies,
+                ...parsed.devDependencies,
+            };
+            for (const [dep, label] of fileRegistry_1.NPM_DEP_SIGNALS) {
+                if (allDeps[dep])
+                    stack.add(label);
+            }
+        }
+        catch { /* ignore invalid JSON */ }
     }
-    if (fileNames.includes('cargo.toml'))
-        stack.push('Rust');
-    if (fileNames.includes('go.mod'))
-        stack.push('Go');
-    if (fileNames.includes('gemfile'))
-        stack.push('Ruby');
-    if (fileNames.includes('build.gradle') || fileNames.includes('pom.xml'))
-        stack.push('Java/JVM');
-    if (allPaths.some(p => p.endsWith('.dart')))
-        stack.push('Dart/Flutter');
-    // TypeScript
-    if (fileNames.includes('tsconfig.json') || allPaths.some(p => p.endsWith('.ts') || p.endsWith('.tsx'))) {
-        stack.push('TypeScript');
+    // --- Bun / Deno detection via lockfiles ---
+    if (fileNameSet.has('bun.lockb') || fileNameSet.has('bunfig.toml'))
+        stack.add('Bun');
+    if (fileNameSet.has('deno.json') || fileNameSet.has('deno.jsonc') || fileNameSet.has('deno.lock'))
+        stack.add('Deno');
+    // --- Python requirements.txt dependency signals ---
+    const reqTxt = files.find(f => f.relativePath === 'requirements.txt' || f.relativePath.endsWith('/requirements.txt'));
+    if (reqTxt) {
+        stack.add('Python');
+        const lower = reqTxt.content.toLowerCase();
+        for (const [dep, label] of fileRegistry_1.PYTHON_DEP_SIGNALS) {
+            if (lower.includes(dep))
+                stack.add(label);
+        }
     }
-    // Docker
-    if (fileNames.includes('dockerfile') || fileNames.includes('docker-compose.yml')) {
-        stack.push('Docker');
+    // --- pyproject.toml dependency signals ---
+    const pyproject = files.find(f => f.relativePath === 'pyproject.toml' || f.relativePath.endsWith('/pyproject.toml'));
+    if (pyproject) {
+        stack.add('Python');
+        const lower = pyproject.content.toLowerCase();
+        for (const [dep, label] of fileRegistry_1.PYTHON_DEP_SIGNALS) {
+            if (lower.includes(dep))
+                stack.add(label);
+        }
     }
-    // Terraform
-    if (allPaths.some(p => p.endsWith('.tf'))) {
-        stack.push('Terraform');
+    // --- Rust ---
+    if (fileNameSet.has('cargo.toml'))
+        stack.add('Rust');
+    // --- Go ---
+    if (fileNameSet.has('go.mod'))
+        stack.add('Go');
+    // --- Ruby ---
+    if (fileNameSet.has('gemfile'))
+        stack.add('Ruby');
+    // --- Java/JVM ---
+    if (fileNameSet.has('build.gradle') || fileNameSet.has('pom.xml'))
+        stack.add('Java/JVM');
+    // --- Flutter / Dart ---
+    if (fileNameSet.has('pubspec.yaml') || allPaths.some(p => p.endsWith('.dart'))) {
+        stack.add('Flutter/Dart');
     }
-    return [...new Set(stack)];
+    // --- Swift / iOS / macOS ---
+    if (allPaths.some(p => p.endsWith('.swift')))
+        stack.add('Swift / iOS / macOS');
+    // --- Kotlin / Android ---
+    if (allPaths.some(p => p.endsWith('.kt') || p.endsWith('.kts')))
+        stack.add('Kotlin / Android');
+    // --- Zig ---
+    if (allPaths.some(p => p.endsWith('.zig')))
+        stack.add('Zig');
+    // --- C / C++ (including embedded) ---
+    const hasCFiles = allPaths.some(p => p.endsWith('.c') || p.endsWith('.h'));
+    const hasCppFiles = allPaths.some(p => p.endsWith('.cpp') || p.endsWith('.hpp') || p.endsWith('.cc'));
+    const hasIno = allPaths.some(p => p.endsWith('.ino'));
+    if (hasIno)
+        stack.add('Arduino / Embedded C++');
+    else if (hasCppFiles)
+        stack.add('C++');
+    else if (hasCFiles)
+        stack.add('C');
+    // --- TypeScript (if not already added via tsconfig signal) ---
+    if (!stack.has('TypeScript') &&
+        (fileNameSet.has('tsconfig.json') || allPaths.some(p => p.endsWith('.ts') || p.endsWith('.tsx')))) {
+        stack.add('TypeScript');
+    }
+    // --- Docker ---
+    if (fileNameSet.has('dockerfile') || fileNameSet.has('docker-compose.yml') || fileNameSet.has('docker-compose.yaml')) {
+        stack.add('Docker');
+    }
+    // --- Kubernetes ---
+    if (allPaths.some(p => p.includes('k8s/') || p.includes('kubernetes/') || p.endsWith('.helm.yaml'))) {
+        stack.add('Kubernetes');
+    }
+    // --- Terraform ---
+    if (allPaths.some(p => p.endsWith('.tf') || p.endsWith('.tfvars'))) {
+        stack.add('Terraform');
+    }
+    // --- Jupyter notebooks ---
+    if (allPaths.some(p => p.endsWith('.ipynb'))) {
+        stack.add('Jupyter Notebooks');
+    }
+    return [...stack].sort();
 }
 function addLineNumbers(content) {
     const lines = content.split('\n');

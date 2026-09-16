@@ -1,6 +1,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import micromatch from 'micromatch';
+import {
+    BUILT_IN_EXTENSIONS,
+    BUILT_IN_FILENAMES,
+    LANGUAGE_MAP,
+    FILENAME_LANGUAGE_MAP,
+    SECRET_EXTENSIONS,
+    SECRET_FILENAMES,
+    ENV_PREFIX,
+    SAFE_ENV_SUFFIXES,
+} from './fileRegistry';
 
 export interface ExportConfig {
     ignoredFolders: string[];
@@ -49,86 +59,76 @@ export function shouldIgnoreFile(fileName: string, config: ExportConfig): boolea
     return false;
 }
 
-export function isSupportedFile(fileName: string, config: ExportConfig): boolean {
-    const ext = path.extname(fileName).toLowerCase();
+/**
+ * Hard security check — must be called BEFORE any file read.
+ * Returns true when the file should NEVER be exported, regardless of user settings.
+ */
+export function isSecretFile(fileName: string): boolean {
+    const lower = fileName.toLowerCase();
 
-    // Files without extensions but in supported list (Dockerfile, Makefile, etc.)
-    if (!ext) {
-        return config.supportedExtensions.includes(fileName);
+    // Exact secret filename match
+    if (SECRET_FILENAMES.has(lower) || SECRET_FILENAMES.has(fileName)) {
+        return true;
     }
 
-    return config.supportedExtensions.includes(ext);
+    // Secret extension match
+    const ext = path.extname(fileName).toLowerCase();
+    if (ext && SECRET_EXTENSIONS.has(ext)) {
+        return true;
+    }
+
+    // .env.* pattern — block unless it's a safe template/example suffix
+    if (lower.startsWith(ENV_PREFIX)) {
+        if (SAFE_ENV_SUFFIXES.has(lower)) {
+            return false; // explicitly safe
+        }
+        return true; // block all other .env.* variants
+    }
+
+    // Bare .env (no extension case — already caught above via SECRET_FILENAMES,
+    // but guard again for safety)
+    if (lower === '.env') {
+        return true;
+    }
+
+    return false;
 }
 
+/**
+ * Returns true if the file should be included in an export.
+ * When the user has a non-empty customised list, that list is the sole authority.
+ * Built-in defaults only apply when the user list is empty (original semantics).
+ */
+export function isSupportedFile(fileName: string, config: ExportConfig): boolean {
+    const ext = path.extname(fileName).toLowerCase();
+    const userList = config.supportedExtensions;
+
+    if (userList.length > 0) {
+        // User list is authoritative — exact extension or exact filename match
+        if (!ext) return userList.includes(fileName);
+        return userList.includes(ext) || userList.includes(fileName);
+    }
+
+    // No user customisation — fall back to built-in registry
+    if (!ext) return BUILT_IN_FILENAMES.has(fileName);
+    return BUILT_IN_EXTENSIONS.has(ext);
+}
+
+/**
+ * Returns the Markdown fenced-block language identifier for a file.
+ * Delegates to the shared registry — no duplicate maps.
+ */
 export function getLanguageId(fileName: string): string {
     const ext = path.extname(fileName).toLowerCase();
-    const map: Record<string, string> = {
-        '.js': 'javascript',
-        '.jsx': 'jsx',
-        '.ts': 'typescript',
-        '.tsx': 'tsx',
-        '.py': 'python',
-        '.rb': 'ruby',
-        '.go': 'go',
-        '.rs': 'rust',
-        '.java': 'java',
-        '.kt': 'kotlin',
-        '.cs': 'csharp',
-        '.cpp': 'cpp',
-        '.c': 'c',
-        '.h': 'c',
-        '.hpp': 'cpp',
-        '.swift': 'swift',
-        '.php': 'php',
-        '.vue': 'vue',
-        '.svelte': 'svelte',
-        '.html': 'html',
-        '.css': 'css',
-        '.scss': 'scss',
-        '.sass': 'sass',
-        '.less': 'less',
-        '.json': 'json',
-        '.yaml': 'yaml',
-        '.yml': 'yaml',
-        '.toml': 'toml',
-        '.xml': 'xml',
-        '.sql': 'sql',
-        '.sh': 'bash',
-        '.bash': 'bash',
-        '.zsh': 'zsh',
-        '.ps1': 'powershell',
-        '.bat': 'batch',
-        '.lua': 'lua',
-        '.r': 'r',
-        '.R': 'r',
-        '.jl': 'julia',
-        '.ex': 'elixir',
-        '.exs': 'elixir',
-        '.erl': 'erlang',
-        '.clj': 'clojure',
-        '.scala': 'scala',
-        '.hs': 'haskell',
-        '.ml': 'ocaml',
-        '.fs': 'fsharp',
-        '.dart': 'dart',
-        '.tf': 'hcl',
-        '.hcl': 'hcl',
-        '.proto': 'protobuf',
-        '.graphql': 'graphql',
-        '.gql': 'graphql',
-        '.md': 'markdown',
-        '.mdx': 'mdx',
-        '.txt': 'text',
-    };
+
+    // Check exact filename first (e.g. Dockerfile, Makefile)
+    if (FILENAME_LANGUAGE_MAP[fileName]) {
+        return FILENAME_LANGUAGE_MAP[fileName];
+    }
 
     if (!ext) {
-        if (fileName === 'Dockerfile') return 'dockerfile';
-        if (fileName === 'Makefile') return 'makefile';
-        if (fileName === 'Rakefile') return 'ruby';
-        if (fileName === 'Gemfile') return 'ruby';
-        if (fileName === 'Pipfile') return 'toml';
         return 'text';
     }
 
-    return map[ext] || 'text';
+    return LANGUAGE_MAP[ext] || 'text';
 }

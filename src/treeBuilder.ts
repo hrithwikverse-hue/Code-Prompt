@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExportConfig, shouldIgnoreFolder, shouldIgnoreFile, isSupportedFile } from './config';
+import { ExportConfig, shouldIgnoreFolder, shouldIgnoreFile, isSupportedFile, isSecretFile } from './config';
 
 export interface TreeNode {
     name: string;
@@ -74,6 +74,8 @@ export function buildTree(
                 children.push(subtree);
             }
         } else if (entryStats.isFile()) {
+            // Hard security gate — secret files must not appear in the tree at all
+            if (isSecretFile(entry)) continue;
             if (shouldIgnoreFile(entry, config)) continue;
             if (!isSupportedFile(entry, config)) continue;
             if (entryStats.size > config.maxFileSizeKB * 1024) continue;

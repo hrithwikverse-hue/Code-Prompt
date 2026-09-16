@@ -98,6 +98,9 @@ function buildTree(rootPath, config, relativeTo) {
             }
         }
         else if (entryStats.isFile()) {
+            // Hard security gate — secret files must not appear in the tree at all
+            if ((0, config_1.isSecretFile)(entry))
+                continue;
             if ((0, config_1.shouldIgnoreFile)(entry, config))
                 continue;
             if (!(0, config_1.isSupportedFile)(entry, config))

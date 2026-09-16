@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getConfig, getLanguageId } from './config';
+import { getConfig, getLanguageId, isSecretFile } from './config';
 import { buildTree } from './treeBuilder';
 import { scanFiles } from './scanner';
 import { formatContext, formatProjectSummary } from './formatter';
@@ -9,6 +9,18 @@ import { createChunks } from './chunker';
 import { smartExport } from './smartSummarizer';
 import { SidebarProvider } from './providers/sidebarProvider';
 import { createStatusBarItem } from './providers/statusBarProvider';
+
+/** Binary / generated file extensions that never require an auto-update cycle. */
+const WATCHER_SKIP_EXTENSIONS = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tiff',
+    '.mp3', '.mp4', '.webm', '.ogg', '.wav', '.avi', '.mov',
+    '.zip', '.tar', '.gz', '.br', '.bz2', '.7z', '.rar',
+    '.exe', '.dll', '.so', '.dylib', '.class', '.pyc', '.pyo',
+    '.woff', '.woff2', '.ttf', '.eot', '.otf',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.bin', '.o', '.obj', '.lib', '.a',
+    '.vsix', '.crx',
+]);
 
 const AUTO_UPDATE_FILES = ['PROJECT_CONTEXT.md', 'SMART_CONTEXT.md', 'SRC_CONTEXT.md', 'CURRENT_FILE_CONTEXT.md', 'FOLDER_CONTEXT.md'];
 
@@ -87,7 +99,19 @@ export function activate(context: vscode.ExtensionContext) {
         );
         const onChange = (uri: vscode.Uri) => {
             const rel = path.relative(workspacePath, uri.fsPath);
+
+            // Always ignore output folders
             if (rel.startsWith('.code prompt' + path.sep) || rel.startsWith('.ai-context' + path.sep)) return;
+
+            const fileName = path.basename(uri.fsPath);
+
+            // Hard security: never trigger auto-update for secret files
+            if (isSecretFile(fileName)) return;
+
+            // Skip binary / media / generated files — they don't affect code context
+            const ext = path.extname(fileName).toLowerCase();
+            if (WATCHER_SKIP_EXTENSIONS.has(ext)) return;
+
             scheduleAutoUpdate(workspacePath);
         };
         watcher.onDidChange(onChange);

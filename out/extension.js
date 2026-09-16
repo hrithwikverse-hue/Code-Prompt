@@ -48,6 +48,17 @@ const chunker_1 = require("./chunker");
 const smartSummarizer_1 = require("./smartSummarizer");
 const sidebarProvider_1 = require("./providers/sidebarProvider");
 const statusBarProvider_1 = require("./providers/statusBarProvider");
+/** Binary / generated file extensions that never require an auto-update cycle. */
+const WATCHER_SKIP_EXTENSIONS = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tiff',
+    '.mp3', '.mp4', '.webm', '.ogg', '.wav', '.avi', '.mov',
+    '.zip', '.tar', '.gz', '.br', '.bz2', '.7z', '.rar',
+    '.exe', '.dll', '.so', '.dylib', '.class', '.pyc', '.pyo',
+    '.woff', '.woff2', '.ttf', '.eot', '.otf',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.bin', '.o', '.obj', '.lib', '.a',
+    '.vsix', '.crx',
+]);
 const AUTO_UPDATE_FILES = ['PROJECT_CONTEXT.md', 'SMART_CONTEXT.md', 'SRC_CONTEXT.md', 'CURRENT_FILE_CONTEXT.md', 'FOLDER_CONTEXT.md'];
 function getMdOutputDir(workspacePath) {
     const dir = path.join(workspacePath, '.code prompt');
@@ -108,7 +119,16 @@ function activate(context) {
         const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(workspacePath, '**/*'));
         const onChange = (uri) => {
             const rel = path.relative(workspacePath, uri.fsPath);
+            // Always ignore output folders
             if (rel.startsWith('.code prompt' + path.sep) || rel.startsWith('.ai-context' + path.sep))
+                return;
+            const fileName = path.basename(uri.fsPath);
+            // Hard security: never trigger auto-update for secret files
+            if ((0, config_1.isSecretFile)(fileName))
+                return;
+            // Skip binary / media / generated files — they don't affect code context
+            const ext = path.extname(fileName).toLowerCase();
+            if (WATCHER_SKIP_EXTENSIONS.has(ext))
                 return;
             scheduleAutoUpdate(workspacePath);
         };
